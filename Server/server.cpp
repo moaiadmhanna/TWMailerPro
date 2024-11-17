@@ -39,67 +39,57 @@ class Server
                 {
                     std::cout << "Client accepted with ID: " << clientSfd << std::endl;
                     Ldap *ldapServer = new Ldap();
+                    std::string command;
                     do
                     {
-                        std::cout << "AM going to run handleclient" << std::endl; 
-                        std::cout << "HELLO ITS ME" << std::endl;
-                        //handleClient(clientSfd, ldapServer);
-                    } while(strncmp(buffer, "quit", 4) == 0);
+                        command = receive_message(clientSfd);
+                        handleClient(clientSfd, ldapServer, command);
+                    } while(command != "QUIT");
+                    std::cout << "Client closed with ID: " << clientSfd << std::endl;
                     close(clientSfd);
                 }
             }
             close(this->socket->getSfd());
         }
 
-        bool is_user_in_blacklist(std::string username){
-            for (auto& entry : blacklist) {
-                if (entry.name == username) {
-                    return true;
-                }
-            }
-            return false;
-        }
+        
 
         void loginClient(int clientSfd, Ldap* ldapServer)
         {
             std::string username = receive_message(clientSfd);
             std::string password = receive_message(clientSfd);
-            if(is_user_in_blacklist(username)){
-                std::cout << username << " is currently in the blacklist" << std::endl;
-                send_to_socket(clientSfd, "ERR");
-                return;
+            std::string message = "";
+            if(is_user_in_blacklist(username) ){
+                if(!is_blacklist_expired(username)){
+                    message = set_error_message(username + " on blacklist. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
+                    send_to_socket(clientSfd, message);
+                    return;
+                }
+                remove_from_blacklist(username);
+                remove_username_attempts(username);
+                
             }
             int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
+            std::cerr << "msg" << ": " << ldap_err2string(rc) << " (" << rc << ")" << std::endl;
             switch(rc){
                 case LDAP_INVALID_CREDENTIALS:
-                    std::cerr << "Login failed: Username or password is wrong." << std::endl;
+                    message = "Username or password is wrong.";
                     break;
                 case LDAP_SUCCESS:
-                    std::cout << "Login succeeded." << std::endl;
-                    send_to_socket(clientSfd, "OK");
+                    send_to_socket(clientSfd, "OK: Login succeeded.");
                     return;
                 default:
-                    std::cerr << "Login failed: Server error" << std::endl;
+                    message = "Server error";
             }
-            auto it = usernameAttempts.find(username);
-            if (it != usernameAttempts.end()){
-                if(it->second == 3)
-                    add_user_to_blacklist(username);
-                else it->second++;
-            }
-            else 
-                usernameAttempts[username] = 1;
-                
-            send_to_socket(clientSfd, "ERR");
+            add_username_attempts(username);
+            send_to_socket(clientSfd, set_error_message(message));
         }
 
-        void handleClient(int clientSfd, Ldap* ldapServer)
+        void handleClient(int clientSfd, Ldap* ldapServer, std::string command)
         {
-            std::string message = receive_message(clientSfd);
-            std::cout << message << std::endl;
-            if(message == "LOGIN")
+            // std::cout << command << std::endl;
+            if(command == "LOGIN" || command == "Login" || command == "login")
             {
-                std::cout << "here" << std::endl;
                 loginClient(clientSfd, ldapServer);
             }
         }
@@ -116,6 +106,7 @@ class Server
         NetworkSocket *socket;
         std::vector<blacklistFormat> blacklist;
         std::map<std::string, int> usernameAttempts;
+        int minutes_in_blacklist = 20;
 
         void close_connection(int clientSfd){
             close(clientSfd);
@@ -144,6 +135,59 @@ class Server
             user.name = username;
             user.time = std::chrono::system_clock::now();
             blacklist.push_back(user);
+        }
+
+        bool const is_blacklist_expired(const std::string& username) {
+            auto curr_time = std::chrono::system_clock::now();
+            const auto timeout_duration = std::chrono::seconds(minutes_in_blacklist);
+
+            for (const auto& entry : blacklist) {
+                if (entry.name == username) {
+                    return curr_time >= entry.time + timeout_duration;
+                }
+            }
+            return false;  
+        }
+
+        std::string set_error_message(std::string message){
+            return "ERR: " + message;
+        }
+
+        bool is_user_in_blacklist(std::string username){
+            for (auto& entry : blacklist) {
+                if (entry.name == username) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void remove_from_blacklist(const std::string& username) {
+            for (auto it = blacklist.begin(); it != blacklist.end(); ) {
+                if (it->name == username) {
+                    it = blacklist.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
+        void add_username_attempts(std::string username){
+            auto it = usernameAttempts.find(username);
+            if (it != usernameAttempts.end()){
+                if(it->second + 1 == 3)
+                    add_user_to_blacklist(username);
+                else it->second++;
+            }
+            else
+                usernameAttempts[username] = 1;
+        }
+
+        void remove_username_attempts(std::string username){
+            auto it = usernameAttempts.find(username);
+            if (it != usernameAttempts.end()) {
+                usernameAttempts.erase(it);
+            }
         }
 };
 int main(int argc, char* argv[])

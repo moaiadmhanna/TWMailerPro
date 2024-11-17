@@ -76,13 +76,15 @@ class Client
             while (true)
             {
                 std::string command;
-                std::cout << "(LOGIN,SEND, LIST, READ, DEL, QUIT): ";
+                std::cout << "(LOGIN, SEND, LIST, READ, DEL, QUIT): ";
                 std::getline(std::cin, command);
-                std::cout << command << std::endl;
                 send_to_socket(command);
-                if (command == "LOGIN")
+                if(command == "LOGIN" || command == "Login" || command == "login")
                 {
                     login_to_server();
+                }else if(command == "QUIT"){
+                    std::cout << "OK: Connection closed successfully." << std::endl;
+                    exit(0);
                 }
                 std::cout << receive_message() << std::endl;
             }

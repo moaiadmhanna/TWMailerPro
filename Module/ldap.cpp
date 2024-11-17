@@ -23,6 +23,7 @@ class Ldap
             {
                 ldap_unbind_ext_s(ldapHandle, NULL, NULL);
                 print_error("Failed to start LDAP connection.", rc);
+                std::cout << rc << std::endl;
                 exit(EXIT_FAILURE);
             }
         };
@@ -36,10 +37,10 @@ class Ldap
 
             BerValue *servercredp;
             int rc = ldap_sasl_bind_s(ldapHandle,bindUserCStr,LDAP_SASL_SIMPLE,&bindCredentials,NULL,NULL,&servercredp);
-            if(rc != LDAP_SUCCESS)
-            {
-                ldap_unbind_ext(ldapHandle, nullptr, nullptr);
-            }
+            // if(rc != LDAP_SUCCESS)
+            // {
+                // ldap_unbind_ext(ldapHandle, nullptr, nullptr);
+            // }
             return rc;
         };
 
