@@ -39,10 +39,11 @@ class Server
                 {
                     std::cout << "Client accepted with ID: " << clientSfd << std::endl;
                     Ldap *ldapServer = new Ldap();
-                    loginClient(clientSfd, ldapServer);
                     do
                     {
-                        handleClient(clientSfd, ldapServer);
+                        std::cout << "AM going to run handleclient" << std::endl; 
+                        std::cout << "HELLO ITS ME" << std::endl;
+                        //handleClient(clientSfd, ldapServer);
                     } while(strncmp(buffer, "quit", 4) == 0);
                     close(clientSfd);
                 }
@@ -61,16 +62,13 @@ class Server
 
         void loginClient(int clientSfd, Ldap* ldapServer)
         {
-            std::string username;
-            std::map<std::string, int> usernameAttempts;
-            
-            username = receive_message(clientSfd);
+            std::string username = receive_message(clientSfd);
             std::string password = receive_message(clientSfd);
             if(is_user_in_blacklist(username)){
                 std::cout << username << " is currently in the blacklist" << std::endl;
-                close_connection(clientSfd);
+                send_to_socket(clientSfd, "ERR");
+                return;
             }
-
             int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
             switch(rc){
                 case LDAP_INVALID_CREDENTIALS:
@@ -78,7 +76,7 @@ class Server
                     break;
                 case LDAP_SUCCESS:
                     std::cout << "Login succeeded." << std::endl;
-                    send_to_socket(clientSfd, "0");
+                    send_to_socket(clientSfd, "OK");
                     return;
                 default:
                     std::cerr << "Login failed: Server error" << std::endl;
@@ -86,25 +84,24 @@ class Server
             auto it = usernameAttempts.find(username);
             if (it != usernameAttempts.end()){
                 if(it->second == 3)
-                    break;
-                it->second++;
+                    add_user_to_blacklist(username);
+                else it->second++;
             }
             else 
                 usernameAttempts[username] = 1;
                 
-            send_to_socket(clientSfd, "1");
-
-            blacklistFormat user;
-            user.name = username;
-            user.time = std::chrono::system_clock::now();
-            blacklist.push_back(user);
-            close_connection(clientSfd);
+            send_to_socket(clientSfd, "ERR");
         }
 
         void handleClient(int clientSfd, Ldap* ldapServer)
         {
             std::string message = receive_message(clientSfd);
-            std::cout << "Received message: " << message << std::endl;
+            std::cout << message << std::endl;
+            if(message == "LOGIN")
+            {
+                std::cout << "here" << std::endl;
+                loginClient(clientSfd, ldapServer);
+            }
         }
 
     private: 
@@ -113,12 +110,13 @@ class Server
             std::string name;
             std::chrono::system_clock::time_point time;
         };
-
         int port;
         const static int BUFFER_SIZE = 1024;
         char buffer[BUFFER_SIZE];
         NetworkSocket *socket;
         std::vector<blacklistFormat> blacklist;
+        std::map<std::string, int> usernameAttempts;
+
         void close_connection(int clientSfd){
             close(clientSfd);
             exit(0);
@@ -134,12 +132,18 @@ class Server
             recv(socketFd, buffer.data(), length, 0);
             return std::string(buffer.data());
         }
-
         void send_to_socket(int clientSfd, std::string message)
         {
             uint32_t length = message.size();
             send(clientSfd, &length, sizeof(length), 0);
             send(clientSfd, message.c_str(), length, 0);
+        }
+        void const add_user_to_blacklist(std::string username)
+        {
+            blacklistFormat user;
+            user.name = username;
+            user.time = std::chrono::system_clock::now();
+            blacklist.push_back(user);
         }
 };
 int main(int argc, char* argv[])

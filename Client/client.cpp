@@ -39,28 +39,24 @@ class Client
 
         void login_to_server()
         {
-            std::string rc;
-            while(true){
-                std::string username;
-                std::string password;
-                std::cout << "Username: ";
-                std::getline(std::cin, username);
+            std::string username;
+            std::string password;
+            std::cout << "Username: ";
+            std::getline(std::cin, username);
 
-                termios oldt;
-                tcgetattr(STDIN_FILENO, &oldt);
-                termios newt = oldt;
-                newt.c_lflag &= ~ECHO;
-                tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-                std::cout << "Password: ";
-                std::getline(std::cin, password);
-                std::cout << std::endl;
-                tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+            termios oldt;
+            tcgetattr(STDIN_FILENO, &oldt);
+            termios newt = oldt;
+            newt.c_lflag &= ~ECHO;
+            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+            std::cout << "Password: ";
+            std::getline(std::cin, password);
+            std::cout << std::endl;
+            tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 
-                send_to_socket(username);
-                send_to_socket(password);
-                if(receive_message() == "0") break;
-            }
-            std::cout << "Success!" << std::endl;
+            send_to_socket(username);
+            send_to_socket(password);
+            
         }
 
         std::string receive_message() {
@@ -77,13 +73,20 @@ class Client
  
         void exchange_messages()
         {
-            // while (true)
-            // {
-                std::cout << "(SEND, LIST, READ, DEL, QUIT): ";
-                // std::getline(std::cin, command);
-            // }
-        }
-  
+            while (true)
+            {
+                std::string command;
+                std::cout << "(LOGIN,SEND, LIST, READ, DEL, QUIT): ";
+                std::getline(std::cin, command);
+                std::cout << command << std::endl;
+                send_to_socket(command);
+                if (command == "LOGIN")
+                {
+                    login_to_server();
+                }
+                std::cout << receive_message() << std::endl;
+            }
+        }  
 
     private:
         std::string ip;
@@ -103,7 +106,6 @@ int main(int argc, char* argv[])
     std::string port = argv[2];
     Client* client = new Client(ip, std::stoi(port));
     client->connect_to_server();
-    client->login_to_server();
     client->exchange_messages();
     return 0;
 }
