@@ -13,27 +13,32 @@ class Client
             this->port = port;
             this->socket = new NetworkSocket(ip, port);
         }
-        void connect_to_server() {
+        void connect_to_server()
+        {
             struct sockaddr_in serveraddr;
             serveraddr.sin_family = AF_INET;
             serveraddr.sin_port = htons(this->port);
             serveraddr.sin_addr.s_addr = INADDR_ANY;
 
             int corrispondingsfd = connect(this->socket->getSfd(), (struct sockaddr *)&serveraddr, sizeof(serveraddr));
-            if (corrispondingsfd == -1) {
+            if (corrispondingsfd == -1)
+            {
                 std::cerr << "Failed to connect to the server" << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
 
-        void send_to_socket(std::string message) {
-            if (send(socket->getSfd(), message.c_str(), message.length(), 0) == -1) {
+        void send_to_socket(std::string message)
+        {
+            if (send(socket->getSfd(), message.c_str(), message.length(), 0) == -1)
+            {
                 std::cerr << "Failed to send message to the server" << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
 
-        void login_to_server(){
+        void login_to_server()
+        {
             std::string username, password;
             std::cout << "Username: ";
             std::getline(std::cin, username);
@@ -43,8 +48,10 @@ class Client
             send_to_socket(password);
         }
  
-        void exchange_messages(){
-            while (true) {
+        void exchange_messages()
+        {
+            while (true)
+            {
                 std::cout << "(SEND, LIST, READ, DEL, QUIT): ";
                 // std::getline(std::cin, command);
 

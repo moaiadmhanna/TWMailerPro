@@ -2,6 +2,7 @@
 #include <string>
 #include <ldap.h>
 #include "../Module/socket.cpp"
+#include "../Module/ldap.cpp"
 #include <cstring>
 #include <unistd.h>
 
@@ -13,7 +14,7 @@ class Server
             this->port = port;
             this->socket = new NetworkSocket(port);
             socket->bind_socket();
-            init_ldap();
+            this->ldapServer = new Ldap();
         }
         void listening()
         {
@@ -47,14 +48,18 @@ class Server
             close(this->socket->getSfd());
         }
 
-        void loginClient(int clientSfd){
+        void loginClient(int clientSfd)
+        {
             char *username = receive_message(clientSfd);
             std::cout << "Username: " << username << std::endl;
             char *password = receive_message(clientSfd);
             std::cout << "Password: " << password << std::endl;
+            ldapServer->bind_ldap_credentials(username,password);
+            std::cout << ldapServer->user_exists() << std::endl;
         }
 
-        void handleClient(int clientSfd) {
+        void handleClient(int clientSfd)
+        {
             char *message = receive_message(clientSfd);
             std::cout << "Received message: " << message << std::endl;
         }
@@ -63,40 +68,30 @@ class Server
         int port;
         const static int BUFFER_SIZE = 1024;
         char buffer[BUFFER_SIZE];
-        NetworkSocket* socket;
-        LDAP *ldapServer;
-        const char *ldaphost = "ldap.technikum.wien.at";
-        const int ldapport = 389;
-
-        char * receive_message(int clientSfd){
+        NetworkSocket *socket;
+        Ldap *ldapServer;
+        char * receive_message(int clientSfd)
+        {
             std::memset(buffer, 0, BUFFER_SIZE);
             int bytes_received = recv(clientSfd, buffer, BUFFER_SIZE, 0);
-            if (bytes_received == -1) {
+            if (bytes_received == -1)
+            {
                 std::cerr << "Failed to receive message from client" << std::endl;
                 exit(EXIT_FAILURE);
-            } else if (bytes_received == 0) {
+            } else if (bytes_received == 0)
+            {
                 std::cout << "Client disconnected." << std::endl;
                 close(clientSfd);
             }
             buffer[bytes_received] = '\0';
             return buffer;
         } 
-        void init_ldap(){
-            LDAP* ldapServer;
-            const char* ldaphost = "ldap.technikum.wien.at"; // Replace with your LDAP server address
-            int ldapport = 389;
-
-            if (ldap_initialize(&ldapServer, ldaphost) != LDAP_SUCCESS) {
-                std::cerr << "Failed to initialize LDAP connection." << std::endl;
-                exit(EXIT_FAILURE);
-            }
-        }
 };
 int main(int argc, char* argv[])
 {
     if(argc < 3)
     {
-        std::cerr << "Usage:"<< argv[0] << " <port> <mail-spool-directoryname>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <port> <mail-spool-directoryname>" << std::endl;
         exit(1);
     }
     std::string port = argv[1];
