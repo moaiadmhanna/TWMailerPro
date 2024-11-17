@@ -67,16 +67,16 @@ class Server
                 }
                 remove_from_blacklist(username);
                 remove_username_attempts(username);
-                
             }
+            // ldapServer = new Ldap();
             int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
-            std::cerr << "msg" << ": " << ldap_err2string(rc) << " (" << rc << ")" << std::endl;
             switch(rc){
                 case LDAP_INVALID_CREDENTIALS:
                     message = "Username or password is wrong.";
                     break;
                 case LDAP_SUCCESS:
                     send_to_socket(clientSfd, "OK: Login succeeded.");
+
                     return;
                 default:
                     message = "Server error";
@@ -106,6 +106,7 @@ class Server
         NetworkSocket *socket;
         std::vector<blacklistFormat> blacklist;
         std::map<std::string, int> usernameAttempts;
+        std::map<int, std::string> sessions;
         int minutes_in_blacklist = 20;
 
         void close_connection(int clientSfd){
@@ -165,7 +166,8 @@ class Server
         void remove_from_blacklist(const std::string& username) {
             for (auto it = blacklist.begin(); it != blacklist.end(); ) {
                 if (it->name == username) {
-                    it = blacklist.erase(it);
+                    blacklist.erase(it);
+                    return;
                 } else {
                     ++it;
                 }
