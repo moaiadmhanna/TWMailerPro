@@ -3,6 +3,8 @@
 #include <ldap.h>
 #include "../Module/socket.cpp"
 #include <unistd.h>
+#include <termios.h>
+#include <vector>
 
 class Client
 {
@@ -30,32 +32,56 @@ class Client
 
         void send_to_socket(std::string message)
         {
-            if (send(socket->getSfd(), message.c_str(), message.length(), 0) == -1)
-            {
-                std::cerr << "Failed to send message to the server" << std::endl;
-                exit(EXIT_FAILURE);
-            }
+            uint32_t length = message.size();
+            send(socket->getSfd(), &length, sizeof(length), 0);
+            send(socket->getSfd(), message.c_str(), length, 0);
         }
 
         void login_to_server()
         {
-            std::string username, password;
-            std::cout << "Username: ";
-            std::getline(std::cin, username);
-            std::cout << "Password: ";
-            std::getline(std::cin, password);
-            send_to_socket(username);
-            send_to_socket(password);
+            std::string rc;
+            while(true){
+                std::string username;
+                std::string password;
+                std::cout << "Username: ";
+                std::getline(std::cin, username);
+
+                termios oldt;
+                tcgetattr(STDIN_FILENO, &oldt);
+                termios newt = oldt;
+                newt.c_lflag &= ~ECHO;
+                tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+                std::cout << "Password: ";
+                std::getline(std::cin, password);
+                std::cout << std::endl;
+                tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+
+                send_to_socket(username);
+                send_to_socket(password);
+                if(receive_message() == "0") break;
+            }
+            std::cout << "Success!" << std::endl;
+        }
+
+        std::string receive_message() {
+            // Empfang der Länge der Nachricht
+            uint32_t length;
+            recv(socket->getSfd(), &length, sizeof(length), 0);
+
+            // Speicher für die Nachricht reservieren
+            std::vector<char> buffer(length + 1, 0); // Nullterminierung hinzufügen
+
+            recv(socket->getSfd(), buffer.data(), length, 0);
+            return std::string(buffer.data());
         }
  
         void exchange_messages()
         {
-            while (true)
-            {
+            // while (true)
+            // {
                 std::cout << "(SEND, LIST, READ, DEL, QUIT): ";
                 // std::getline(std::cin, command);
-
-            }
+            // }
         }
   
 
