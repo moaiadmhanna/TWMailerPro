@@ -117,11 +117,6 @@ class Server
             std::string receiverName = receive_message(clientSfd);
             std::string subject = receive_message(clientSfd);
             std::string messageBody = receive_message(clientSfd);
-            if(senderName == receiverName)
-            {
-                send_to_socket(clientSfd,"ERR: Can not send to this user");
-                return;
-            }
             if(!ldapServer->valid_user(receiverName))
             {
                 send_to_socket(clientSfd,"ERR: Receiver does not Exist");
@@ -137,6 +132,17 @@ class Server
             for(auto file: messages_list){
                 send_to_socket(clientSfd, file);
             }
+        }
+        void handle_read(int clientSfd, std::string clientIp)
+        {
+            size_t  messageNumber = std::stoi(receive_message(clientSfd)) - 1;
+            std::string message = directoryManger->get_message(sessions[clientIp],messageNumber);
+            if(message == "")
+            {
+                send_to_socket(clientSfd,"ERR");
+                return;
+            }
+            send_to_socket(clientSfd,message);
         }
 
         void handle_client(int clientSfd, Ldap* ldapServer, std::string command)
@@ -172,6 +178,11 @@ class Server
             else if(command == "list"){
                 send_to_socket(clientSfd, "OK");
                 handle_list(clientSfd,clientIp);
+            }
+            else if(command == "read")
+            {
+                send_to_socket(clientSfd, "OK");
+                handle_read(clientSfd,clientIp);
             }
             else
             {
