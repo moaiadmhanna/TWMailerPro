@@ -78,6 +78,13 @@ class Client
             }
             send_to_socket(message_body);
         }
+        void read_to_server()
+        {
+            std::string command;
+            std::cout << "Message Number >> ";
+            std::getline(std::cin, command);
+            send_to_socket(command);
+        }
 
         std::string receive_message() {
             // Empfang der Länge der Nachricht
@@ -123,7 +130,7 @@ class Client
                 }
                 else if(command == "read")
                 {
-                    // send_to_server();
+                    read_to_server();
                     print_message(receive_message());
                 }
                 else if(command == "list")

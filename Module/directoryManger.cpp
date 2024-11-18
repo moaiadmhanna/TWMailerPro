@@ -81,6 +81,21 @@ class DirectoryManger
             }
             return messages;
         }
+        std::string get_message(std::string sender, size_t  messageNumber)
+        {
+            auto messages = get_messages(sender);
+            if(messageNumber >= messages.size()) return "";
+            std::string filePath = mailDirectory + "/" + sender + "/" + messages[messageNumber];
+            std::ifstream file(filePath);
+            std::string message = "\n\n";
+            if(file)
+            {
+                std::string line;
+                while (std::getline(file, line))
+                    message += line + "\n";
+            }
+            return message;
+        }
     private:
         DIR* directory = nullptr;
         std::string mailDirectory;
