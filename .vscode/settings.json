@@ -55,6 +55,7 @@
   "C_Cpp_Runner.msvcSecureNoWarnings": false,
   "files.associations": {
     "*.embeddedhtml": "html",
+    ".fantomasignore": "ignore",
     "__bit_reference": "cpp",
     "__config": "cpp",
     "__debug": "cpp",
@@ -143,6 +144,7 @@
     "stop_token": "cpp",
     "text_encoding": "cpp",
     "thread": "cpp",
-    "map": "cpp"
+    "map": "cpp",
+    "fstream": "cpp"
   }
 }

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <termios.h>
 #include <vector>
+#include <algorithm>
 
 class Client
 {
@@ -79,14 +80,22 @@ class Client
                 std::cout << "(LOGIN, SEND, LIST, READ, DEL, QUIT): ";
                 std::getline(std::cin, command);
                 send_to_socket(command);
-                if(command == "LOGIN" || command == "Login" || command == "login")
+                std::string response = receive_message();
+                command = to_lower(command);
+                if(strncmp(response.c_str(),"OK",2) != 0)
+                {
+                    std::cout << response << std::endl;
+                    continue;
+                }
+                if(command == "login")
                 {
                     login_to_server();
-                }else if(command == "QUIT"){
-                    std::cout << "OK: Connection closed successfully." << std::endl;
+                    std::cout << receive_message() << std::endl;
+                }
+                else if(command == "quit")
+                {
                     exit(0);
                 }
-                std::cout << receive_message() << std::endl;
             }
         }  
 
@@ -95,6 +104,14 @@ class Client
         int port;
         std::string buffer;
         NetworkSocket* socket;
+
+        std::string to_lower(std::string message)
+        {
+            std::transform(message.begin(), message.end(), message.begin(),
+                [](unsigned char c){ return std::tolower(c); });
+            return message;
+        }
+      
 
 };
 int main(int argc, char* argv[])

@@ -8,6 +8,7 @@
 #include <chrono>
 #include <ctime>
 #include <map>
+#include <algorithm>
 class Server
 {
     public:
@@ -40,58 +41,18 @@ class Server
                     std::cout << "Client accepted with ID: " << clientSfd << std::endl;
                     Ldap *ldapServer = new Ldap();
                     std::string command;
-                    do
+                    while(true)
                     {
                         command = receive_message(clientSfd);
+                        if(to_lower(command) == "quit") break;
                         handleClient(clientSfd, ldapServer, command);
-                    } while(command != "QUIT");
+                    };
+                    send_to_socket(clientSfd,"OK: Connection closed successfully.");
                     std::cout << "Client closed with ID: " << clientSfd << std::endl;
                     close(clientSfd);
                 }
             }
             close(this->socket->getSfd());
-        }
-
-        
-
-        void loginClient(int clientSfd, Ldap* ldapServer)
-        {
-            std::string username = receive_message(clientSfd);
-            std::string password = receive_message(clientSfd);
-            std::string message = "";
-            if(is_user_in_blacklist(username) ){
-                if(!is_blacklist_expired(username)){
-                    message = set_error_message(username + " on blacklist. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
-                    send_to_socket(clientSfd, message);
-                    return;
-                }
-                remove_from_blacklist(username);
-                remove_username_attempts(username);
-            }
-            // ldapServer = new Ldap();
-            int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
-            switch(rc){
-                case LDAP_INVALID_CREDENTIALS:
-                    message = "Username or password is wrong.";
-                    break;
-                case LDAP_SUCCESS:
-                    send_to_socket(clientSfd, "OK: Login succeeded.");
-
-                    return;
-                default:
-                    message = "Server error";
-            }
-            add_username_attempts(username);
-            send_to_socket(clientSfd, set_error_message(message));
-        }
-
-        void handleClient(int clientSfd, Ldap* ldapServer, std::string command)
-        {
-            // std::cout << command << std::endl;
-            if(command == "LOGIN" || command == "Login" || command == "login")
-            {
-                loginClient(clientSfd, ldapServer);
-            }
         }
 
     private: 
@@ -109,10 +70,65 @@ class Server
         std::map<int, std::string> sessions;
         int minutes_in_blacklist = 20;
 
+        void loginClient(int clientSfd, Ldap* ldapServer)
+        {
+            std::string username = receive_message(clientSfd);
+            std::string password = receive_message(clientSfd);
+            std::string message = "";
+            if(is_user_in_blacklist(username) ){
+                if(!is_blacklist_expired(username)){
+                    message = set_error_message(username + " on blacklist. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
+                    send_to_socket(clientSfd, message);
+                    return;
+                }
+                remove_from_blacklist(username);
+                remove_username_attempts(username);
+            }
+            int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
+            switch(rc){
+                case LDAP_INVALID_CREDENTIALS:
+                    message = "Username or password is wrong.";
+                    break;
+                case LDAP_SUCCESS:
+                    send_to_socket(clientSfd, "OK: Login succeeded.");
+                    sessions[clientSfd] = username;
+                    return;
+                default:
+                    message = "Server error";
+            }
+            add_username_attempts(username);
+            send_to_socket(clientSfd, set_error_message(message));
+        }
+
+        void handleClient(int clientSfd, Ldap* ldapServer, std::string command)
+        {
+            command = to_lower(command);
+            if (command == "login") {
+                if (is_logged_in(clientSfd))
+                {
+                    send_to_socket(clientSfd, set_error_message("You are already logged in"));
+                    return;
+                } 
+                send_to_socket(clientSfd, "OK");
+                loginClient(clientSfd,ldapServer);
+            } 
+            else if (!is_logged_in(clientSfd))
+                send_to_socket(clientSfd, set_error_message("You need to login"));
+            else if(command == "read")
+            {
+                send_to_socket(clientSfd, "OK");
+            }
+            else
+            {
+                send_to_socket(clientSfd, set_error_message("Invalid Input!"));
+            }
+        }
+        
         void close_connection(int clientSfd){
             close(clientSfd);
             exit(0);
         }
+        
         std::string receive_message(int socketFd) {
             // Empfang der Länge der Nachricht
             uint32_t length;
@@ -124,12 +140,14 @@ class Server
             recv(socketFd, buffer.data(), length, 0);
             return std::string(buffer.data());
         }
+        
         void send_to_socket(int clientSfd, std::string message)
         {
             uint32_t length = message.size();
             send(clientSfd, &length, sizeof(length), 0);
             send(clientSfd, message.c_str(), length, 0);
         }
+        
         void const add_user_to_blacklist(std::string username)
         {
             blacklistFormat user;
@@ -190,6 +208,19 @@ class Server
             if (it != usernameAttempts.end()) {
                 usernameAttempts.erase(it);
             }
+        }
+        
+        std::string to_lower(std::string message)
+        {
+            std::transform(message.begin(), message.end(), message.begin(),
+                [](unsigned char c){ return std::tolower(c); });
+            return message;
+        }
+        
+        bool is_logged_in(int clienSfd)
+        {
+            auto it = sessions.find(clienSfd);
+            return it != sessions.end();
         }
 };
 int main(int argc, char* argv[])
