@@ -59,6 +59,25 @@ class Client
             send_to_socket(password);
             
         }
+        void send_to_server()
+        {
+            std::string command;
+            std::cout << "Receiver >>";
+            std::getline(std::cin, command);
+            send_to_socket(command);
+            std::cout << "Subject >>";
+            std::getline(std::cin, command);
+            send_to_socket(command);
+             // Continue sending message body until user inputs "."
+            std::string message_body;
+            while(1) {
+                std::cout << "Message (. to SEND) >>";
+                std::getline(std::cin, command);  // Send input
+                message_body += command + "\n";
+                if(command == ".") break;  // End when "." is entered
+            }
+            send_to_socket(message_body);
+        }
 
         std::string receive_message() {
             // Empfang der Länge der Nachricht
@@ -92,12 +111,17 @@ class Client
                     login_to_server();
                     std::cout << receive_message() << std::endl;
                 }
+                else if(command == "send")
+                {
+                    send_to_server();
+                    std::cout << receive_message() << std::endl;
+                }
                 else if(command == "quit")
                 {
                     exit(0);
                 }
             }
-        }  
+        }
 
     private:
         std::string ip;

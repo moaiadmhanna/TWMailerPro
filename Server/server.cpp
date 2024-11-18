@@ -28,7 +28,7 @@ class Server
                 exit(EXIT_FAILURE);
             }
         }
-        void acceptClients()
+        void accept_clients()
         {
             std::cout << "Waiting for clients..." << std::endl;
             while(true)
@@ -47,7 +47,7 @@ class Server
                     {
                         command = receive_message(clientSfd);
                         if(to_lower(command) == "quit") break;
-                        handleClient(clientSfd, ldapServer, command);
+                        handle_client(clientSfd, ldapServer, command);
                     };
                     remove_session(get_client_ip(clientSfd));
                     send_to_socket(clientSfd,"OK: Connection closed successfully.");
@@ -70,7 +70,7 @@ class Server
         NetworkSocket *socket;
         std::vector<blacklistFormat> blacklist;
         std::map<std::string, int> usernameAttempts;
-        std::map<std::string,int> sessions;
+        std::map<std::string,std::string> sessions;
         int minutes_in_blacklist = 1;
         DirectoryManger *directoryManger;
 
@@ -85,9 +85,8 @@ class Server
             }
             return nullptr;
         }
-        void loginClient(int clientSfd, Ldap* ldapServer)
+        void handle_login(int clientSfd, Ldap* ldapServer, std::string clientIp)
         {
-            std::string clientIp = get_client_ip(clientSfd);
             std::string username = receive_message(clientSfd);
             std::string password = receive_message(clientSfd);
             std::string message = "";
@@ -98,7 +97,7 @@ class Server
                     break;
                 case LDAP_SUCCESS:
                     send_to_socket(clientSfd, "OK: Login succeeded.");
-                    sessions[clientIp] = clientSfd;
+                    sessions[clientIp] = username;
                     return;
                 default:
                     message = "Server error";
@@ -107,7 +106,16 @@ class Server
             send_to_socket(clientSfd, set_error_message(message));
         }
 
-        void handleClient(int clientSfd, Ldap* ldapServer, std::string command)
+        void handle_send(int clientSfd,std::string clientIp)
+        {
+            std::string senderName = sessions[clientIp];
+            std::string receiverName = receive_message(clientSfd);
+            std::string subject = receive_message(clientSfd);
+            std::string messageBody = receive_message(clientSfd);
+            
+
+        }
+        void handle_client(int clientSfd, Ldap* ldapServer, std::string command)
         {
             std::string clientIp = get_client_ip(clientSfd);
             if(is_user_in_blacklist(clientIp) ){
@@ -127,14 +135,14 @@ class Server
                     return;
                 } 
                 send_to_socket(clientSfd, "OK");
-                loginClient(clientSfd, ldapServer);
+                handle_login(clientSfd,ldapServer,clientIp);
             } 
             else if (!is_logged_in(clientIp))
                 send_to_socket(clientSfd, set_error_message("You need to login"));
             else if(command == "send")
-            {
-                
+            {  
                 send_to_socket(clientSfd, "OK");
+                handle_send(clientSfd,clientIp);
 
             }
             else
@@ -261,6 +269,6 @@ int main(int argc, char* argv[])
     std::string mailDirectory = argv[2];
     Server* server = new Server(std::stoi(port),mailDirectory);
     server->listening();
-    server->acceptClients();
+    server->accept_clients();
     return 0;
 }
