@@ -30,11 +30,11 @@ class Ldap
         {
             LDAPMessage *searchResult;
             std::string ldapFilter = "(uid="+ user + ")";
-            rc = ldap_search_ext_s(
+            int rc = ldap_search_ext_s(
                 ldapHandle,
                 ldapSearchBase,
                 ldapSearchScope,
-                ldapFilter,
+                ldapFilter.c_str(),
                 (char **)ldapSearchResultAttributes,
                 0,
                 NULL,
