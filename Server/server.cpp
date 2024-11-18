@@ -40,6 +40,7 @@ class Server
                 if(clientSfd == -1) continue;
                 if((pid = fork()) == 0)
                 {
+                    std::string clientIp = get_client_ip(clientSfd);
                     std::cout << "Client accepted with ID: " << clientSfd << std::endl;
                     Ldap *ldapServer = new Ldap();
                     std::string command;
@@ -49,9 +50,9 @@ class Server
                         if(to_lower(command) == "quit") break;
                         handle_client(clientSfd, ldapServer, command);
                     };
-                    remove_session(get_client_ip(clientSfd));
+                    remove_session(clientIp);
                     send_to_socket(clientSfd,"OK: Connection closed successfully.");
-                    std::cout << "Client closed with ID: " << get_client_ip(clientSfd) << std::endl;
+                    std::cout << "Client closed with ID: " << clientIp << std::endl;
                     close(clientSfd);
                 }
             }
@@ -116,12 +117,21 @@ class Server
             std::string receiverName = receive_message(clientSfd);
             std::string subject = receive_message(clientSfd);
             std::string messageBody = receive_message(clientSfd);
-            
 
         }
+        void handle_list(int clientSfd, std::string clientIp){
+            std::vector<std::string> messages_list = directoryManger->get_messages(sessions[clientIp]);
+            send_to_socket(clientSfd, std::to_string(messages_list.size())); 
+            if (messages_list.empty()) return;
+            for(auto file: messages_list){
+                send_to_socket(clientSfd, file);
+            }
+        }
+
         void handle_client(int clientSfd, Ldap* ldapServer, std::string command)
         {
             std::string clientIp = get_client_ip(clientSfd);
+
             if(is_user_in_blacklist(clientIp) ){
                 if(!is_blacklist_expired(clientIp)){
                     std::string message = set_error_message("You are blacklisted. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
@@ -147,7 +157,10 @@ class Server
             {  
                 send_to_socket(clientSfd, "OK");
                 handle_send(clientSfd,clientIp);
-
+            }
+            else if(command == "list"){
+                send_to_socket(clientSfd, "OK");
+                handle_list(clientSfd,clientIp);
             }
             else
             {

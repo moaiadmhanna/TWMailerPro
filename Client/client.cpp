@@ -74,7 +74,7 @@ class Client
                 std::cout << "Message (. to SEND) >>";
                 std::getline(std::cin, command);  // Send input
                 message_body += command + "\n";
-                if(command == ".") break;  // End when "." is entered
+                if(!command.empty() && command[command.length() - 1] == '.') break;  // End when "." is entered
             }
             send_to_socket(message_body);
         }
@@ -88,7 +88,11 @@ class Client
             std::vector<char> buffer(length + 1, 0); // Nullterminierung hinzufügen
 
             recv(socket->getSfd(), buffer.data(), length, 0);
-            return "<< " + std::string(buffer.data());
+            return std::string(buffer.data());
+        }
+
+        void print_message(std::string message){
+            std::cout << "<< " + message << std::endl;
         }
  
         void exchange_messages()
@@ -101,35 +105,39 @@ class Client
                 send_to_socket(command);
                 std::string response = receive_message();
                 command = to_lower(command);
-                if(strncmp(response.c_str(),"ERR",3) == 0)
+                if(strncmp(response.c_str(), "ERR", 3) == 0)
                 {
-                    std::cout << response << std::endl;
+                    print_message(response);
                     continue;
                 }
-                if(command == "login")
+                else if(command == "login")
                 {
                     login_to_server();
-                    std::cout << receive_message() << std::endl;
+                    print_message(receive_message());
                 }
                 else if(command == "send")
                 {
                     send_to_server();
-                    std::cout << receive_message() << std::endl;
+                    print_message(receive_message());
+
                 }
                 else if(command == "read")
                 {
                     // send_to_server();
-                    // std::cout << receive_message() << std::endl;
+                    print_message(receive_message());
                 }
                 else if(command == "list")
                 {
-                    // send_to_server();
-                    // std::cout << receive_message() << std::endl;
+                    std::string count = receive_message();
+                    print_message(count + " messages...");
+                    int message_counter = 0;
+                    while (++message_counter <= std::stoi(count)) 
+                        print_message(std::to_string(message_counter) + ": " + receive_message());
                 }
                 else if(command == "del")
                 {
                     // send_to_server();
-                    // std::cout << receive_message() << std::endl;
+                    print_message(receive_message());
                 }
                 else if(command == "quit")
                 {

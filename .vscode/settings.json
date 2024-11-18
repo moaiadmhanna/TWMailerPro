@@ -38,10 +38,7 @@
   "C_Cpp_Runner.compilerArgs": [],
   "C_Cpp_Runner.linkerArgs": [],
   "C_Cpp_Runner.includePaths": [],
-  "C_Cpp_Runner.includeSearch": [
-    "*",
-    "**/*"
-  ],
+  "C_Cpp_Runner.includeSearch": ["*", "**/*"],
   "C_Cpp_Runner.excludeSearch": [
     "**/build",
     "**/build/**",
@@ -148,6 +145,7 @@
     "text_encoding": "cpp",
     "thread": "cpp",
     "map": "cpp",
-    "fstream": "cpp"
+    "fstream": "cpp",
+    "codecvt": "cpp"
   }
 }
