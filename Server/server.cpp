@@ -116,7 +116,12 @@ class Server
             std::string receiverName = receive_message(clientSfd);
             std::string subject = receive_message(clientSfd);
             std::string messageBody = receive_message(clientSfd);
-            if(ldapServer->valid_user(receiverName))
+            if(senderName == receiverName)
+            {
+                send_to_socket(clientSfd,"ERR: Can not send to this user");
+                return;
+            }
+            if(!ldapServer->valid_user(receiverName))
             {
                 send_to_socket(clientSfd,"ERR: Receiver does not Exist");
                 return;

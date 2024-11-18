@@ -40,14 +40,20 @@ class Ldap
                 NULL,
                 NULL,
                 NULL,
-                500,
+                5000,
                 &searchResult);
-            if (rc != LDAP_SUCCESS)
-            {
-                std::cerr << "LDAP search error: " << ldap_err2string(rc) << std::endl;
-                return false;
-            }
-            return ldap_count_entries(ldapHandle, searchResult) > 0;
+                std::cout << ldapFilter << std::endl;
+                // Get the number of entries in the search result
+                int entryCount = ldap_count_entries(ldapHandle, searchResult);
+                std::cout << "Found " << entryCount << " entries." << std::endl;
+                if (rc != LDAP_SUCCESS)
+                {
+                    std::cerr << "LDAP search error: " << ldap_err2string(rc) << std::endl;
+                    return false;
+                }
+                ldap_msgfree(searchResult);
+                // Return true if there are entries, otherwise false
+                return entryCount > 0;
 
         }
 
