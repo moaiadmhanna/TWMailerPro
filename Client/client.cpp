@@ -13,14 +13,14 @@ class Client
         Client(std::string ip, int port)
         {
             this->ip = ip;
-            this->port = port;
-            this->socket = new NetworkSocket(ip, port);
+            this->serverPort = port;
+            this->socket = new NetworkSocket(ip, 0);
         }
         void connect_to_server()
         {
             struct sockaddr_in serveraddr;
             serveraddr.sin_family = AF_INET;
-            serveraddr.sin_port = htons(this->port);
+            serveraddr.sin_port = htons(this->serverPort);
             serveraddr.sin_addr.s_addr = INADDR_ANY;
 
             int corrispondingsfd = connect(this->socket->getSfd(), (struct sockaddr *)&serveraddr, sizeof(serveraddr));
@@ -101,7 +101,7 @@ class Client
 
     private:
         std::string ip;
-        int port;
+        int serverPort;
         std::string buffer;
         NetworkSocket* socket;
 
