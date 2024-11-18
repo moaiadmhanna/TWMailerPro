@@ -24,7 +24,7 @@ class Server
         {
             if (listen(this->socket->getSfd(), 6) == -1 )
             {
-                std::cerr << "Connection could not be established. Socket is unable to accept new connections" << errno << std::endl;
+                std::cerr << "Connection could not be established. Socket is unable to accept new connections." << errno << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
@@ -119,10 +119,10 @@ class Server
             std::string messageBody = receive_message(clientSfd);
             if(!ldapServer->valid_user(receiverName))
             {
-                send_to_socket(clientSfd,"ERR: Receiver does not Exist");
+                send_to_socket(clientSfd,"ERR: Receiver does not exist.");
                 return;
             }
-            directoryManger->save_message(senderName,receiverName,subject,messageBody) ? send_to_socket(clientSfd,"OK: Message Saved") : send_to_socket(clientSfd,"ERR");
+            directoryManger->save_message(senderName,receiverName,subject,messageBody) ? send_to_socket(clientSfd,"OK: Message sent successfully.") : send_to_socket(clientSfd,"ERR");
 
         }
         void handle_list(int clientSfd, std::string clientIp){
@@ -139,10 +139,17 @@ class Server
             std::string message = directoryManger->get_message(sessions[clientIp],messageNumber);
             if(message == "")
             {
-                send_to_socket(clientSfd,"ERR");
+                send_to_socket(clientSfd,"ERR: Message not found.");
                 return;
             }
             send_to_socket(clientSfd,message);
+        }
+
+        void handle_delete(int clientSfd, std::string clientIp)
+        {
+            size_t  messageNumber = std::stoi(receive_message(clientSfd)) - 1;
+            bool deleted = directoryManger->delete_message(sessions[clientIp],messageNumber);
+            deleted ? send_to_socket(clientSfd, "OK: Message deleted succesfully."): send_to_socket(clientSfd,"ERR: Message not found.");
         }
 
         void handle_client(int clientSfd, Ldap* ldapServer, std::string command)
@@ -162,14 +169,14 @@ class Server
             if (command == "login") {
                 if (is_logged_in(clientIp))
                 {
-                    send_to_socket(clientSfd, set_error_message("You are already logged in"));
+                    send_to_socket(clientSfd, set_error_message("You are already logged in."));
                     return;
                 } 
                 send_to_socket(clientSfd, "OK");
                 handle_login(clientSfd,ldapServer,clientIp);
             } 
             else if (!is_logged_in(clientIp))
-                send_to_socket(clientSfd, set_error_message("You need to login"));
+                send_to_socket(clientSfd, set_error_message("Please log in to continue."));
             else if(command == "send")
             {  
                 send_to_socket(clientSfd, "OK");
@@ -184,9 +191,14 @@ class Server
                 send_to_socket(clientSfd, "OK");
                 handle_read(clientSfd,clientIp);
             }
+            else if(command == "delete" || command == "del")
+            {
+                send_to_socket(clientSfd, "OK");
+                handle_delete(clientSfd,clientIp);
+            }
             else
             {
-                send_to_socket(clientSfd, set_error_message("Invalid Input!"));
+                send_to_socket(clientSfd, set_error_message("Invalid option."));
             }
         }
         

@@ -96,6 +96,13 @@ class DirectoryManger
             }
             return message;
         }
+        bool delete_message(std::string sender, size_t  messageNumber){
+            auto messages = get_messages(sender);
+            if(messageNumber >= messages.size()) return false;
+            std::string filename = mailDirectory + "/" + sender + "/" + messages[messageNumber];
+            return std::remove(filename.c_str()) == 0;
+        }
+        
     private:
         DIR* directory = nullptr;
         std::string mailDirectory;

@@ -86,6 +86,13 @@ class Client
             send_to_socket(command);
         }
 
+        void delete_to_server(){
+            std::string command;
+            std::cout << "Message Number >> ";
+            std::getline(std::cin, command);
+            send_to_socket(command);
+        }
+
         std::string receive_message() {
             // Empfang der Länge der Nachricht
             uint32_t length;
@@ -136,18 +143,19 @@ class Client
                 else if(command == "list")
                 {
                     std::string count = receive_message();
-                    print_message(count + " messages...");
+                    print_message(count + " messages");
                     int message_counter = 0;
                     while (++message_counter <= std::stoi(count)) 
                         print_message(std::to_string(message_counter) + ": " + receive_message());
                 }
-                else if(command == "del")
+                else if(command == "delete" || command == "del")
                 {
-                    // send_to_server();
+                    delete_to_server();
                     print_message(receive_message());
                 }
                 else if(command == "quit")
                 {
+                    // print_message(receive_message());
                     exit(0);
                 }
             }
