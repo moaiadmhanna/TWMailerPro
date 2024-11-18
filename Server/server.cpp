@@ -69,9 +69,10 @@ class Server
         char buffer[BUFFER_SIZE];
         NetworkSocket *socket;
         std::vector<blacklistFormat> blacklist;
-        std::map<std::string, int> usernameAttempts;
+        std::map<std::string, int> loginAttempts;
         std::map<std::string,std::string> sessions;
-        int minutes_in_blacklist = 1;
+        const int minutes_in_blacklist = 1;
+        const int max_login_attempts = 3;
         DirectoryManger *directoryManger;
 
         std::string get_client_ip(int client_sfd) {
@@ -91,9 +92,12 @@ class Server
             std::string password = receive_message(clientSfd);
             std::string message = "";
             int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
+            int attempts;
             switch(rc){
                 case LDAP_INVALID_CREDENTIALS:
-                    message = "Username or password is wrong.";
+                    attempts = get_login_attempts(clientIp);
+                    message = "Username or password is wrong. " + (attempts - 1 > 0 ? std::to_string(attempts - 1) + " attempts remaining.":"Try again in " + std::to_string(minutes_in_blacklist) + " min.");
+                    add_username_attempts(clientIp);
                     break;
                 case LDAP_SUCCESS:
                     send_to_socket(clientSfd, "OK: Login succeeded.");
@@ -102,7 +106,7 @@ class Server
                 default:
                     message = "Server error";
             }
-            add_username_attempts(clientIp);
+            
             send_to_socket(clientSfd, set_error_message(message));
         }
 
@@ -120,7 +124,7 @@ class Server
             std::string clientIp = get_client_ip(clientSfd);
             if(is_user_in_blacklist(clientIp) ){
                 if(!is_blacklist_expired(clientIp)){
-                    std::string message = set_error_message("You are on blacklist. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
+                    std::string message = set_error_message("You are blacklisted. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
                     send_to_socket(clientSfd, message);
                     return;
                 }
@@ -220,20 +224,20 @@ class Server
         }
 
         void add_username_attempts(std::string clientIp){
-            auto it = usernameAttempts.find(clientIp);
-            if (it != usernameAttempts.end()){
-                if(it->second + 1 == 3)
-                    add_user_to_blacklist(clientIp);
-                else it->second++;
+            auto it = loginAttempts.find(clientIp);
+            if (it != loginAttempts.end()){
+                if(it->second + 1 < max_login_attempts)
+                    it->second++;
+                else add_user_to_blacklist(clientIp);
             }
             else
-                usernameAttempts[clientIp] = 1;
+                loginAttempts[clientIp] = 1;
         }
 
         void remove_username_attempts(std::string clientIp){
-            auto it = usernameAttempts.find(clientIp);
-            if (it != usernameAttempts.end()) {
-                usernameAttempts.erase(it);
+            auto it = loginAttempts.find(clientIp);
+            if (it != loginAttempts.end()) {
+                loginAttempts.erase(it);
             }
         }
         
@@ -256,6 +260,14 @@ class Server
             if (it != sessions.end()) {
                 sessions.erase(it);
             }
+        }
+
+        int get_login_attempts(std::string clientIp){
+            auto it = loginAttempts.find(clientIp);
+            if (it != loginAttempts.end()) {
+                return max_login_attempts - it->second;
+            }
+            return max_login_attempts;
         }
 };
 int main(int argc, char* argv[])

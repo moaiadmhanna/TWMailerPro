@@ -88,7 +88,7 @@ class Client
             std::vector<char> buffer(length + 1, 0); // Nullterminierung hinzufügen
 
             recv(socket->getSfd(), buffer.data(), length, 0);
-            return std::string(buffer.data());
+            return "<< " + std::string(buffer.data());
         }
  
         void exchange_messages()
@@ -96,7 +96,7 @@ class Client
             while (true)
             {
                 std::string command;
-                std::cout << "(LOGIN, SEND, LIST, READ, DEL, QUIT): ";
+                std::cout << "<< (LOGIN, SEND, LIST, READ, DEL, QUIT): ";
                 std::getline(std::cin, command);
                 send_to_socket(command);
                 std::string response = receive_message();
@@ -115,6 +115,21 @@ class Client
                 {
                     send_to_server();
                     std::cout << receive_message() << std::endl;
+                }
+                else if(command == "read")
+                {
+                    // send_to_server();
+                    // std::cout << receive_message() << std::endl;
+                }
+                else if(command == "list")
+                {
+                    // send_to_server();
+                    // std::cout << receive_message() << std::endl;
+                }
+                else if(command == "del")
+                {
+                    // send_to_server();
+                    // std::cout << receive_message() << std::endl;
                 }
                 else if(command == "quit")
                 {
