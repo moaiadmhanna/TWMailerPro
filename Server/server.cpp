@@ -111,12 +111,23 @@ class Server
             send_to_socket(clientSfd, set_error_message(message));
         }
 
-        void handle_send(int clientSfd,std::string clientIp)
+        void handle_send(int clientSfd,Ldap* ldapServer,std::string clientIp)
         {
             std::string senderName = sessions[clientIp];
             std::string receiverName = receive_message(clientSfd);
             std::string subject = receive_message(clientSfd);
             std::string messageBody = receive_message(clientSfd);
+            if(senderName == receiverName)
+            {
+                send_to_socket(clientSfd,"ERR: Can not send to this user");
+                return;
+            }
+            if(!ldapServer->valid_user(receiverName))
+            {
+                send_to_socket(clientSfd,"ERR: Receiver does not Exist");
+                return;
+            }
+            directoryManger->save_message(senderName,receiverName,subject,messageBody) ? send_to_socket(clientSfd,"OK: Message Saved") : send_to_socket(clientSfd,"ERR");
 
         }
         void handle_list(int clientSfd, std::string clientIp){
