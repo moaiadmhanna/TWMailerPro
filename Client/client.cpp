@@ -74,7 +74,7 @@ class Client
                 std::cout << "Message (. to SEND) >>";
                 std::getline(std::cin, command);  // Send input
                 message_body += command + "\n";
-                if(command == ".") break;  // End when "." is entered
+                if(!command.empty() && command[command.length() - 1] == '.') break;  // End when "." is entered
             }
             send_to_socket(message_body);
         }

@@ -112,8 +112,7 @@ class Server
             std::string receiverName = receive_message(clientSfd);
             std::string subject = receive_message(clientSfd);
             std::string messageBody = receive_message(clientSfd);
-            
-
+            directoryManger->save_message(senderName,receiverName,subject,messageBody) ? send_to_socket(clientSfd,"OK: Message Saved") : send_to_socket(clientSfd,"ERR");
         }
         void handle_client(int clientSfd, Ldap* ldapServer, std::string command)
         {

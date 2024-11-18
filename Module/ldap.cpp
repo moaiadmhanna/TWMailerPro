@@ -26,6 +26,30 @@ class Ldap
             }
             return rc;
         };
+        bool valid_user(std::string user)
+        {
+            LDAPMessage *searchResult;
+            std::string ldapFilter = "(uid="+ user + ")";
+            rc = ldap_search_ext_s(
+                ldapHandle,
+                ldapSearchBase,
+                ldapSearchScope,
+                ldapFilter,
+                (char **)ldapSearchResultAttributes,
+                0,
+                NULL,
+                NULL,
+                NULL,
+                500,
+                &searchResult);
+            if (rc != LDAP_SUCCESS)
+            {
+                std::cerr << "LDAP search error: " << ldap_err2string(rc) << std::endl;
+                return false;
+            }
+            return ldap_count_entries(ldapHandle, searchResult) > 0;
+
+        }
 
     private:
         const char *ldapUri = "ldap://ldap.technikum-wien.at:389";
