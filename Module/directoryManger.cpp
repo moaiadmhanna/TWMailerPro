@@ -81,6 +81,9 @@ class DirectoryManger
             }
             return messages;
         }
+        bool delete_message(std::string sender){
+            // TODO
+        }
     private:
         DIR* directory = nullptr;
         std::string mailDirectory;
