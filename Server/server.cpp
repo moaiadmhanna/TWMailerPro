@@ -49,8 +49,9 @@ class Server
                         if(to_lower(command) == "quit") break;
                         handleClient(clientSfd, ldapServer, command);
                     };
+                    remove_session(get_client_ip(clientSfd));
                     send_to_socket(clientSfd,"OK: Connection closed successfully.");
-                    std::cout << "Client closed with ID: " << clientSfd << std::endl;
+                    std::cout << "Client closed with ID: " << get_client_ip(clientSfd) << std::endl;
                     close(clientSfd);
                 }
             }
@@ -60,7 +61,7 @@ class Server
     private: 
 
         struct blacklistFormat {
-            std::string name;
+            std::string ip;
             std::chrono::system_clock::time_point time;
         };
         int port;
@@ -69,24 +70,27 @@ class Server
         NetworkSocket *socket;
         std::vector<blacklistFormat> blacklist;
         std::map<std::string, int> usernameAttempts;
-        std::map<int, std::string> sessions;
+        std::map<std::string,int> sessions;
         int minutes_in_blacklist = 1;
         DirectoryManger *directoryManger;
 
+        std::string get_client_ip(int client_sfd) {
+            struct sockaddr_in client_addr;
+            socklen_t addr_len = sizeof(client_addr);
+
+            if (getpeername(client_sfd, (struct sockaddr *)&client_addr, &addr_len) == 0) {
+                char client_ip[INET_ADDRSTRLEN]; 
+                inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
+                return std::string(client_ip);
+            }
+            return nullptr;
+        }
         void loginClient(int clientSfd, Ldap* ldapServer)
         {
+            std::string clientIp = get_client_ip(clientSfd);
             std::string username = receive_message(clientSfd);
             std::string password = receive_message(clientSfd);
             std::string message = "";
-            if(is_user_in_blacklist(username) ){
-                if(!is_blacklist_expired(username)){
-                    message = set_error_message(username + " on blacklist. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
-                    send_to_socket(clientSfd, message);
-                    return;
-                }
-                remove_from_blacklist(username);
-                remove_username_attempts(username);
-            }
             int rc = ldapServer->bind_ldap_credentials((char*)username.c_str(),(char*) password.c_str());
             switch(rc){
                 case LDAP_INVALID_CREDENTIALS:
@@ -94,31 +98,42 @@ class Server
                     break;
                 case LDAP_SUCCESS:
                     send_to_socket(clientSfd, "OK: Login succeeded.");
-                    sessions[clientSfd] = username;
+                    sessions[clientIp] = clientSfd;
                     return;
                 default:
                     message = "Server error";
             }
-            add_username_attempts(username);
+            add_username_attempts(clientIp);
             send_to_socket(clientSfd, set_error_message(message));
         }
 
         void handleClient(int clientSfd, Ldap* ldapServer, std::string command)
         {
+            std::string clientIp = get_client_ip(clientSfd);
+            if(is_user_in_blacklist(clientIp) ){
+                if(!is_blacklist_expired(clientIp)){
+                    std::string message = set_error_message("You are on blacklist. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
+                    send_to_socket(clientSfd, message);
+                    return;
+                }
+                remove_from_blacklist(clientIp);
+                remove_username_attempts(clientIp);
+            }
             command = to_lower(command);
             if (command == "login") {
-                if (is_logged_in(clientSfd))
+                if (is_logged_in(clientIp))
                 {
                     send_to_socket(clientSfd, set_error_message("You are already logged in"));
                     return;
                 } 
                 send_to_socket(clientSfd, "OK");
-                loginClient(clientSfd,ldapServer);
+                loginClient(clientSfd, ldapServer);
             } 
-            else if (!is_logged_in(clientSfd))
+            else if (!is_logged_in(clientIp))
                 send_to_socket(clientSfd, set_error_message("You need to login"));
             else if(command == "send")
             {
+                
                 send_to_socket(clientSfd, "OK");
 
             }
@@ -152,20 +167,20 @@ class Server
             send(clientSfd, message.c_str(), length, 0);
         }
         
-        void const add_user_to_blacklist(std::string username)
+        void const add_user_to_blacklist(std::string clientIp)
         {
-            blacklistFormat user;
-            user.name = username;
-            user.time = std::chrono::system_clock::now();
-            blacklist.push_back(user);
+            blacklistFormat client;
+            client.ip = clientIp;
+            client.time = std::chrono::system_clock::now();
+            blacklist.push_back(client);
         }
 
-        bool const is_blacklist_expired(const std::string& username) {
+        bool const is_blacklist_expired(const std::string& clientIp) {
             auto curr_time = std::chrono::system_clock::now();
             const auto timeout_duration = std::chrono::minutes(minutes_in_blacklist);
 
             for (const auto& entry : blacklist) {
-                if (entry.name == username) {
+                if (entry.ip == clientIp) {
                     return curr_time >= entry.time + timeout_duration;
                 }
             }
@@ -176,19 +191,18 @@ class Server
             return "ERR: " + message;
         }
 
-        bool is_user_in_blacklist(std::string username){
+        bool is_user_in_blacklist(std::string clientIp){
             for (auto& entry : blacklist) {
-                if (entry.name == username) {
+                if (entry.ip == clientIp) {
                     return true;
                 }
             }
             return false;
         }
 
-        void remove_from_blacklist(const std::string& username) {
+        void remove_from_blacklist(const std::string& clientIp) {
             for (auto it = blacklist.begin(); it != blacklist.end(); ) {
-                if (it->name == username)
-                {
+                if (it->ip == clientIp) {
                     blacklist.erase(it);
                     return;
                 } 
@@ -197,19 +211,19 @@ class Server
             }
         }
 
-        void add_username_attempts(std::string username){
-            auto it = usernameAttempts.find(username);
+        void add_username_attempts(std::string clientIp){
+            auto it = usernameAttempts.find(clientIp);
             if (it != usernameAttempts.end()){
                 if(it->second + 1 == 3)
-                    add_user_to_blacklist(username);
+                    add_user_to_blacklist(clientIp);
                 else it->second++;
             }
             else
-                usernameAttempts[username] = 1;
+                usernameAttempts[clientIp] = 1;
         }
 
-        void remove_username_attempts(std::string username){
-            auto it = usernameAttempts.find(username);
+        void remove_username_attempts(std::string clientIp){
+            auto it = usernameAttempts.find(clientIp);
             if (it != usernameAttempts.end()) {
                 usernameAttempts.erase(it);
             }
@@ -222,10 +236,18 @@ class Server
             return message;
         }
         
-        bool is_logged_in(int clienSfd)
+        bool is_logged_in(std::string clientIp)
         {
-            auto it = sessions.find(clienSfd);
+            auto it = sessions.find(clientIp);
             return it != sessions.end();
+        }
+
+        void remove_session(std::string clientIp)
+        {
+            auto it = sessions.find(clientIp);
+            if (it != sessions.end()) {
+                sessions.erase(it);
+            }
         }
 };
 int main(int argc, char* argv[])
