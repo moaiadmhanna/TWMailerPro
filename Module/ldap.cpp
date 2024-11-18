@@ -42,10 +42,8 @@ class Ldap
                 NULL,
                 5000,
                 &searchResult);
-                std::cout << ldapFilter << std::endl;
                 // Get the number of entries in the search result
                 int entryCount = ldap_count_entries(ldapHandle, searchResult);
-                std::cout << "Found " << entryCount << " entries." << std::endl;
                 if (rc != LDAP_SUCCESS)
                 {
                     std::cerr << "LDAP search error: " << ldap_err2string(rc) << std::endl;
@@ -88,7 +86,6 @@ class Ldap
             {
                 ldap_unbind_ext_s(ldapHandle, NULL, NULL);
                 print_error("Failed to start LDAP connection.", rc);
-                std::cout << rc << std::endl;
                 exit(EXIT_FAILURE);
             }
         }

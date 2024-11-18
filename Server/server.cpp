@@ -167,7 +167,7 @@ class Server
             else if(command == "send")
             {  
                 send_to_socket(clientSfd, "OK");
-                handle_send(clientSfd,clientIp);
+                handle_send(clientSfd, ldapServer, clientIp);
             }
             else if(command == "list"){
                 send_to_socket(clientSfd, "OK");

@@ -53,13 +53,14 @@ class DirectoryManger
                 auto now = std::chrono::system_clock::now();  // Get current time
                 auto now_time_t = std::chrono::system_clock::to_time_t(now);  // Convert to time_t
                 std::tm tm = *std::localtime(&now_time_t);  // Convert to local time
-                file <<"AT: " <<std::put_time(&tm, "%Y-%m-%d %H:%M:%S") << std::endl;
+                file <<"AT: " <<std::put_time(&tm, "%Y-%m-%d %H:%M") << std::endl;
                 // Use a stringstream to break the message into lines by newline
                 std::stringstream ss(messageFull);
-                std::string line;
-
+                std::string line ;
+                file << "---Message---" << std::endl;
                 // Write each line from the message to the file
                 while (std::getline(ss, line)) {
+                    if(line == ".") continue;
                     file << line << std::endl; // Write the line followed by a newline
                 }
 
