@@ -82,7 +82,7 @@ class Client
                 send_to_socket(command);
                 std::string response = receive_message();
                 command = to_lower(command);
-                if(strncmp(response.c_str(),"OK",2) != 0)
+                if(strncmp(response.c_str(),"ERR",3) == 0)
                 {
                     std::cout << response << std::endl;
                     continue;

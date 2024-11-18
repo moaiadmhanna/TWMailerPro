@@ -2,6 +2,7 @@
 #include <string>
 #include "../Module/socket.cpp"
 #include "../Module/ldap.cpp"
+#include "../Module/directoryManger.cpp"
 #include <cstring>
 #include <unistd.h>
 #include <vector>
@@ -12,10 +13,11 @@
 class Server
 {
     public:
-        Server(int port)
+        Server(int port, std::string mail_directory)
         {
             this->port = port;
             this->socket = new NetworkSocket(port);
+            this->directoryManger = new DirectoryManger(mail_directory);
             socket->bind_socket();
         }
         void listening()
@@ -68,7 +70,8 @@ class Server
         std::vector<blacklistFormat> blacklist;
         std::map<std::string, int> usernameAttempts;
         std::map<int, std::string> sessions;
-        int minutes_in_blacklist = 20;
+        int minutes_in_blacklist = 1;
+        DirectoryManger *directoryManger;
 
         void loginClient(int clientSfd, Ldap* ldapServer)
         {
@@ -114,9 +117,10 @@ class Server
             } 
             else if (!is_logged_in(clientSfd))
                 send_to_socket(clientSfd, set_error_message("You need to login"));
-            else if(command == "read")
+            else if(command == "send")
             {
                 send_to_socket(clientSfd, "OK");
+
             }
             else
             {
@@ -158,7 +162,7 @@ class Server
 
         bool const is_blacklist_expired(const std::string& username) {
             auto curr_time = std::chrono::system_clock::now();
-            const auto timeout_duration = std::chrono::seconds(minutes_in_blacklist);
+            const auto timeout_duration = std::chrono::minutes(minutes_in_blacklist);
 
             for (const auto& entry : blacklist) {
                 if (entry.name == username) {
@@ -183,12 +187,13 @@ class Server
 
         void remove_from_blacklist(const std::string& username) {
             for (auto it = blacklist.begin(); it != blacklist.end(); ) {
-                if (it->name == username) {
+                if (it->name == username)
+                {
                     blacklist.erase(it);
                     return;
-                } else {
+                } 
+                else
                     ++it;
-                }
             }
         }
 
@@ -231,7 +236,8 @@ int main(int argc, char* argv[])
         exit(1);
     }
     std::string port = argv[1];
-    Server* server = new Server(std::stoi(port));
+    std::string mailDirectory = argv[2];
+    Server* server = new Server(std::stoi(port),mailDirectory);
     server->listening();
     server->acceptClients();
     return 0;
