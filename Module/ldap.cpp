@@ -12,13 +12,20 @@ class Ldap
         int bind_ldap_credentials(char *username, char *password)
         {
             if(ldapHandle == nullptr) init_ldap();
+
+            // Construct LDAP bind user DN
             std::string ldapBindUser = "uid=" + std::string(username) + ",ou=people," + std::string(ldapSearchBase);
+
+            // Set bind credentials
             bindCredentials.bv_val = password;
             bindCredentials.bv_len = strlen(password);
             const char *bindUserCStr = ldapBindUser.c_str();
 
+            // Perform SASL bind operation
             BerValue *servercredp;
             int rc = ldap_sasl_bind_s(ldapHandle,bindUserCStr,LDAP_SASL_SIMPLE,&bindCredentials,NULL,NULL,&servercredp);
+            
+            // Unbind on failure
             if(rc != LDAP_SUCCESS)
             {
                 ldap_unbind_ext(ldapHandle, nullptr, nullptr);
@@ -28,8 +35,11 @@ class Ldap
         };
         bool valid_user(std::string user)
         {
+            // Construct LDAP filter to search for user by uid
+            std::string ldapFilter = "(uid=" + user + ")";
+
+            // Perform LDAP search operation
             LDAPMessage *searchResult;
-            std::string ldapFilter = "(uid="+ user + ")";
             int rc = ldap_search_ext_s(
                 ldapHandle,
                 ldapSearchBase,
@@ -42,27 +52,35 @@ class Ldap
                 NULL,
                 5000,
                 &searchResult);
-                // Get the number of entries in the search result
-                int entryCount = ldap_count_entries(ldapHandle, searchResult);
-                if (rc != LDAP_SUCCESS)
-                {
-                    std::cerr << "LDAP search error: " << ldap_err2string(rc) << std::endl;
-                    return false;
-                }
-                ldap_msgfree(searchResult);
-                // Return true if there are entries, otherwise false
-                return entryCount > 0;
+            // Get the number of entries in the search result
+            int entryCount = ldap_count_entries(ldapHandle, searchResult);
+
+            // Check if search was successful
+            if (rc != LDAP_SUCCESS)
+            {
+                std::cerr << "LDAP search error: " << ldap_err2string(rc) << std::endl;
+                return false;
+            }
+            // Free the search result memory
+            ldap_msgfree(searchResult);
+
+            // Return true if there are entries, otherwise false
+            return entryCount > 0;
 
         }
 
     private:
-        const char *ldapUri = "ldap://ldap.technikum-wien.at:389";
-        const int ldapVersion = LDAP_VERSION3;
-        const char *ldapSearchBase= "dc=technikum-wien,dc=at";
-        ber_int_t ldapSearchScope = LDAP_SCOPE_SUBTREE;
-        const char *ldapSearchResultAttributes[3] = {"uid", "cn", NULL};
-        BerValue bindCredentials;
-        LDAP *ldapHandle;
+        // LDAP server URI and configuration
+        const char *ldapUri = "ldap://ldap.technikum-wien.at:389";  // URI of the LDAP server
+        const int ldapVersion = LDAP_VERSION3;  // LDAP protocol version (v3)
+        const char *ldapSearchBase = "dc=technikum-wien,dc=at";  // Base DN for LDAP search
+        ber_int_t ldapSearchScope = LDAP_SCOPE_SUBTREE;  // Search scope (subtree search)
+        const char *ldapSearchResultAttributes[3] = {"uid", "cn", NULL};  // Attributes to retrieve in search result
+
+        // LDAP bind credentials and handle
+        BerValue bindCredentials;  // Stores credentials for LDAP bind
+        LDAP *ldapHandle;  // LDAP handle to maintain the session
+
 
         void print_error(std::string msg, int errorCode){
             std::cerr << msg << ": " << ldap_err2string(errorCode) << " (" << errorCode << ")" << std::endl;

@@ -18,7 +18,7 @@ class NetworkSocket
         }
         void create_socket()
         {
-            this->sfd = socket(AF_INET, SOCK_STREAM, 0);
+            this->sfd = socket(AF_INET, SOCK_STREAM, 0);  // Create a TCP socket (IPv4)
             if (this->sfd == -1)
             {
                 std::cerr << "Socket creation failed with error" << errno << std::endl;
@@ -27,6 +27,7 @@ class NetworkSocket
         }
         void setup_socket()
         {
+            // Configures socket to allow address reuse
             int enable = 1;
             if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1)
             {
@@ -37,6 +38,7 @@ class NetworkSocket
 
         void bind_socket()
         {
+            // Binds the socket to the specified address and port
             if (bind(sfd,(struct sockaddr *) &socketAddress, sizeof(socketAddress)) == -1)
             {
                 std::cerr << "Binding failed to " << errno << std::endl;
