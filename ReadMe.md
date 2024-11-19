@@ -44,7 +44,6 @@ The TW-Mailer Pro project is implemented in C++, leveraging modern programming p
 - **Delete Messages**: Delete specific messages from your own directory.
 
 ## User Input
-Here are the possible user inputs for the TwMailerPro system:
 
 ```SEND```: Send a message to a specified recipient and save it in their directory.
    - **Format**:
@@ -79,7 +78,7 @@ To set up TwMailerPro, follow these steps:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/TwMailerPro.git
+   git clone https://github.com/moaiadmhanna/TwMailerPro.git
    ```
 
 2. Navigate to the project directory:
@@ -97,7 +96,7 @@ To set up TwMailerPro, follow these steps:
 ### Server Side
 To start the TwMailerPro server, run the following command:
 ```bash
-./TwMailerPro_server.out <port> <mail_spool_directory>
+./twmailer-pro-server.out <port> <mail_spool_directory>
 ```
 - `<port>`: Specify the port number for the server.
 - `<mail_spool_directory>`: Specify the directory where messages will be stored.
@@ -105,7 +104,7 @@ To start the TwMailerPro server, run the following command:
 ### Client Side
 To start the TwMailerPro client, run the following command:
 ```bash
-./TwMailerPro_client.out <ip> <port>
+./twmailer-pro-client.out <ip> <port>
 ```
 - `<ip>`: Specify the server's IP address.
 - `<port>`: Specify the port number on which the server is running.
