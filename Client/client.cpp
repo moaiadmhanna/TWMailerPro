@@ -17,6 +17,7 @@ class Client
             this->ip = ip;
             this->serverPort = port;
             this->socket = new NetworkSocket(ip, 0);
+            this->socket->bind_socket();
         }
         void connect_to_server()
         {
@@ -32,6 +33,47 @@ class Client
                 exit(EXIT_FAILURE);
             }
         }
+
+        void start()
+        {
+            while (true)
+            {
+                std::string command;
+                std::cout << "(LOGIN, SEND, LIST, READ, DEL, QUIT) >> ";
+                if (!std::getline(std::cin, command) || command.empty()) continue;
+                send_to_socket(command);
+                std::string response = receive_message();
+                command = to_lower(command);
+
+                if(strncmp(response.c_str(), "ERR", 3) == 0)
+                {
+                    print_message(response);
+                    continue;
+                }
+                for (const auto& [name, func] : server_options) {
+                    if (command == name) {
+                        func(); 
+                        if(command != "list" && command != "quit" ) 
+                            print_message(receive_message());
+                    }
+                }
+            }
+        }
+
+    private:
+        std::string ip;
+        int serverPort;
+        std::string buffer;
+        NetworkSocket* socket;
+        const size_t MAX_SUBJECT_LENGTH = 80;
+        std::map<std::string, std::function<void()>> server_options = {
+            { "login", [this]() { login_to_server(); }},
+            { "send", [this]() { send_to_server(); }},
+            { "read",  [this]() { message_number_to_server(); }},
+            { "del", [this]() { message_number_to_server(); }},
+            { "list", [this]() { list_to_server(); }},
+            { "quit", [this](){ exit(0); }}
+        };
 
         void send_to_socket(std::string message)
         {
@@ -141,48 +183,6 @@ class Client
         void print_message(std::string message){
             std::cout << "<< " + message << std::endl;
         }
-
-        void start()
-        {
-            while (true)
-            {
-                std::string command;
-                std::cout << "(LOGIN, SEND, LIST, READ, DEL, QUIT) >> ";
-                if (!std::getline(std::cin, command) || command.empty()) continue;
-                send_to_socket(command);
-                std::string response = receive_message();
-                command = to_lower(command);
-
-                if(strncmp(response.c_str(), "ERR", 3) == 0)
-                {
-                    print_message(response);
-                    continue;
-                }
-                for (const auto& [name, func] : server_commands) {
-                    if (command == name) {
-                        func(); 
-                        if(command != "list" && command != "quit" ) 
-                            print_message(receive_message());
-                    }
-                }
-            }
-        }
-
-    private:
-        std::string ip;
-        int serverPort;
-        std::string buffer;
-        NetworkSocket* socket;
-        const size_t MAX_SUBJECT_LENGTH = 80;
-        std::map<std::string, std::function<void()>> server_commands = {
-            { "login", [this]() { login_to_server(); }},
-            { "send", [this]() { send_to_server(); }},
-            { "read",  [this]() { message_number_to_server(); }},
-            { "del", [this]() { message_number_to_server(); }},
-            { "list", [this]() { list_to_server(); }},
-            { "quit", [this](){ exit(0); }}
-        };
-
         std::string to_lower(std::string message)
         {
             std::transform(message.begin(), message.end(), message.begin(),

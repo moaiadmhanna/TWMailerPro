@@ -10,6 +10,8 @@
 #include <ctime>
 #include <map>
 #include <algorithm>
+#include <functional>
+#include <sys/wait.h>
 class Server
 {
     public:
@@ -20,16 +22,9 @@ class Server
             this->directoryManger = new DirectoryManger(mail_directory);
             socket->bind_socket();
         }
-        void listening()
+        void start()
         {
-            if (listen(this->socket->getSfd(), 6) == -1 )
-            {
-                std::cerr << "Connection could not be established. Socket is unable to accept new connections." << errno << std::endl;
-                exit(EXIT_FAILURE);
-            }
-        }
-        void accept_clients()
-        {
+            listening();
             std::cout << "Waiting for clients..." << std::endl;
             while(true)
             {
@@ -38,7 +33,7 @@ class Server
                 socklen_t clientLen = sizeof(clientAddr);
                 int clientSfd = accept(this->socket->getSfd(),(struct sockaddr *) &clientAddr,&clientLen);
                 if(clientSfd == -1) continue;
-                if((pid = fork()) == 0)
+                if((pid = fork()) == 0) // Child
                 {
                     std::string clientIp = get_client_ip(clientSfd);
                     std::cout << "Client accepted with ID: " << clientSfd << std::endl;
@@ -48,19 +43,20 @@ class Server
                     {
                         command = receive_message(clientSfd);
                         if(to_lower(command) == "quit") break;
-                        handle_client(clientSfd, ldapServer, command);
+                        handle_socket(clientSfd, ldapServer, command);
                     };
                     remove_session(clientIp);
                     send_to_socket(clientSfd,"OK: Connection closed successfully.");
                     std::cout << "Client closed with ID: " << clientIp << std::endl;
                     close(clientSfd);
                 }
+                else if (pid > 0)  // Parent
+                    while(waitpid(-1, NULL, WNOHANG) > 0); 
             }
             close(this->socket->getSfd());
         }
 
     private: 
-
         struct blacklistFormat {
             std::string ip;
             std::chrono::system_clock::time_point time;
@@ -75,7 +71,22 @@ class Server
         const int minutes_in_blacklist = 1;
         const int max_login_attempts = 3;
         DirectoryManger *directoryManger;
+        std::map<std::string, std::function<void(int, Ldap*, std::string)>> options = {
+            { "login", [this](int clientSfd, Ldap* ldapServer, std::string clientIp) { handle_login(clientSfd, ldapServer, clientIp); }},
+            { "send", [this](int clientSfd, Ldap* ldapServer, std::string clientIp) { handle_send(clientSfd, ldapServer, clientIp); }},
+            { "read", [this](int clientSfd, Ldap* ldapServer, std::string clientIp) { handle_read(clientSfd, ldapServer, clientIp); }},
+            { "del", [this](int clientSfd, Ldap* ldapServer, std::string clientIp) { handle_delete(clientSfd, ldapServer, clientIp); }},
+            { "list", [this](int clientSfd, Ldap* ldapServer, std::string clientIp) { handle_list(clientSfd, ldapServer, clientIp); }},
+        };
 
+        void listening()
+        {
+            if (listen(this->socket->getSfd(), 6) == -1 )
+            {
+                std::cerr << "Connection could not be established. Socket is unable to accept new connections." << errno << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
         std::string get_client_ip(int client_sfd) {
             struct sockaddr_in client_addr;
             socklen_t addr_len = sizeof(client_addr);
@@ -85,7 +96,7 @@ class Server
                 inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
                 return std::string(client_ip);
             }
-            return nullptr;
+            return "";
         }
         void handle_login(int clientSfd, Ldap* ldapServer, std::string clientIp)
         {
@@ -118,46 +129,38 @@ class Server
             std::string subject = receive_message(clientSfd);
             std::string messageBody = receive_message(clientSfd);
             if(!ldapServer->valid_user(receiverName))
-            {
                 send_to_socket(clientSfd,"ERR: Receiver does not exist.");
-                return;
-            }
-            directoryManger->save_message(senderName,receiverName,subject,messageBody) ? send_to_socket(clientSfd,"OK: Message sent successfully.") : send_to_socket(clientSfd,"ERR");
+            else
+                directoryManger->save_message(senderName,receiverName,subject,messageBody) ? send_to_socket(clientSfd,"OK: Message sent successfully.") : send_to_socket(clientSfd,"ERR");
 
         }
-        void handle_list(int clientSfd, std::string clientIp){
+        void handle_list(int clientSfd, Ldap* ldapServer, std::string clientIp){
             std::vector<std::string> messages_list = directoryManger->get_messages(sessions[clientIp]);
             send_to_socket(clientSfd, std::to_string(messages_list.size())); 
             if (messages_list.empty()) return;
-            for(auto file: messages_list){
+            for(auto file: messages_list)
                 send_to_socket(clientSfd, file);
-            }
         }
-        void handle_read(int clientSfd, std::string clientIp)
+        void handle_read(int clientSfd, Ldap* ldapServer, std::string clientIp)
         {
-            size_t  messageNumber = std::stoi(receive_message(clientSfd)) - 1;
-            std::string message = directoryManger->get_message(sessions[clientIp],messageNumber);
-            if(message == "")
-            {
+            size_t messageNumber = std::stoi(receive_message(clientSfd)) - 1;
+            std::string message_file = directoryManger->get_message(sessions[clientIp],messageNumber);
+            if(message_file.empty())
                 send_to_socket(clientSfd,"ERR: Message not found.");
-                return;
-            }
-            send_to_socket(clientSfd,message);
+            else send_to_socket(clientSfd,message_file);
         }
-
-        void handle_delete(int clientSfd, std::string clientIp)
+        void handle_delete(int clientSfd, Ldap* ldapServer, std::string clientIp)
         {
             size_t  messageNumber = std::stoi(receive_message(clientSfd)) - 1;
             bool deleted = directoryManger->delete_message(sessions[clientIp],messageNumber);
             deleted ? send_to_socket(clientSfd, "OK: Message deleted succesfully."): send_to_socket(clientSfd,"ERR: Message not found.");
         }
 
-        void handle_client(int clientSfd, Ldap* ldapServer, std::string command)
+        void handle_socket(int clientSfd, Ldap* ldapServer, std::string command)
         {
             std::string clientIp = get_client_ip(clientSfd);
 
             if(is_user_in_blacklist(clientIp) ){
-                std::cout << "IP is in Blacklist" << std::endl;
                 if(!is_blacklist_expired(clientIp)){
                     std::string message = set_error_message("You are blacklisted. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
                     send_to_socket(clientSfd, message);
@@ -166,41 +169,27 @@ class Server
                 remove_from_blacklist(clientIp);
                 remove_username_attempts(clientIp);
             }
+
             command = to_lower(command);
-            if (command == "login") {
-                if (is_logged_in(clientIp))
-                {
-                    send_to_socket(clientSfd, set_error_message("You are already logged in."));
-                    return;
-                } 
-                send_to_socket(clientSfd, "OK");
-                handle_login(clientSfd,ldapServer,clientIp);
-            } 
-            else if (!is_logged_in(clientIp))
-                send_to_socket(clientSfd, set_error_message("Please log in to continue."));
-            else if(command == "send")
-            {  
-                send_to_socket(clientSfd, "OK");
-                handle_send(clientSfd, ldapServer, clientIp);
+            auto it = options.find(command); // first: name | second: func()
+            if (it != options.end()) {
+                if (command == "login") {
+                    if (is_logged_in(clientIp))
+                    {
+                        send_to_socket(clientSfd, set_error_message("You are already logged in."));
+                        return;
+                    } 
+                    send_to_socket(clientSfd, "OK");
+                    handle_login(clientSfd,ldapServer,clientIp);
+                } else if (!is_logged_in(clientIp))
+                    send_to_socket(clientSfd, set_error_message("Please log in to continue."));
+                else{
+                    send_to_socket(clientSfd, "OK");
+                    it->second(clientSfd, ldapServer, clientIp); 
+                }
             }
-            else if(command == "list"){
-                send_to_socket(clientSfd, "OK");
-                handle_list(clientSfd,clientIp);
-            }
-            else if(command == "read")
-            {
-                send_to_socket(clientSfd, "OK");
-                handle_read(clientSfd,clientIp);
-            }
-            else if(command == "delete" || command == "del")
-            {
-                send_to_socket(clientSfd, "OK");
-                handle_delete(clientSfd,clientIp);
-            }
-            else
-            {
-                send_to_socket(clientSfd, set_error_message("Invalid option."));
-            }
+            else send_to_socket(clientSfd, set_error_message("Invalid option."));
+            
         }
         
         void close_connection(int clientSfd){
@@ -240,9 +229,8 @@ class Server
             const auto timeout_duration = std::chrono::minutes(minutes_in_blacklist);
 
             for (const auto& entry : blacklist) {
-                if (entry.ip == clientIp) {
+                if (entry.ip == clientIp)
                     return curr_time >= entry.time + timeout_duration;
-                }
             }
             return false;  
         }
@@ -253,9 +241,8 @@ class Server
 
         bool is_user_in_blacklist(std::string clientIp){
             for (auto& entry : blacklist) {
-                if (entry.ip == clientIp) {
+                if (entry.ip == clientIp)
                     return true;
-                }
             }
             return false;
         }
@@ -284,9 +271,8 @@ class Server
 
         void remove_username_attempts(std::string clientIp){
             auto it = loginAttempts.find(clientIp);
-            if (it != loginAttempts.end()) {
+            if (it != loginAttempts.end())
                 loginAttempts.erase(it);
-            }
         }
         
         std::string to_lower(std::string message)
@@ -305,16 +291,14 @@ class Server
         void remove_session(std::string clientIp)
         {
             auto it = sessions.find(clientIp);
-            if (it != sessions.end()) {
+            if (it != sessions.end())
                 sessions.erase(it);
-            }
         }
 
         int get_login_attempts(std::string clientIp){
             auto it = loginAttempts.find(clientIp);
-            if (it != loginAttempts.end()) {
+            if (it != loginAttempts.end())
                 return max_login_attempts - it->second;
-            }
             return max_login_attempts;
         }
 };
@@ -328,7 +312,6 @@ int main(int argc, char* argv[])
     std::string port = argv[1];
     std::string mailDirectory = argv[2];
     Server* server = new Server(std::stoi(port),mailDirectory);
-    server->listening();
-    server->accept_clients();
+    server->start();
     return 0;
 }
