@@ -6,6 +6,8 @@
 #include <termios.h>
 #include <vector>
 #include <algorithm>
+#include <functional>
+#include <map>
 
 class Client
 {
@@ -42,18 +44,28 @@ class Client
         {
             std::string username;
             std::string password;
-            std::cout << "Username: ";
-            std::getline(std::cin, username);
+            while(true){
+               
+                // Username
+                std::cout << "Username >> ";
+                std::getline(std::cin, username);
 
-            termios oldt;
-            tcgetattr(STDIN_FILENO, &oldt);
-            termios newt = oldt;
-            newt.c_lflag &= ~ECHO;
-            tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-            std::cout << "Password: ";
-            std::getline(std::cin, password);
-            std::cout << std::endl;
-            tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+                // Hide input
+                termios oldt;
+                tcgetattr(STDIN_FILENO, &oldt);
+                termios newt = oldt;
+                newt.c_lflag &= ~ECHO;
+                tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+                // Password
+                std::cout << "Password >> ";
+                std::getline(std::cin, password);
+                std::cout << std::endl;
+                tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Unhide input
+                if(!username.empty() && !password.empty())
+                    break;
+                std::cerr << "ERR: Username or password cannot be blank." << std::endl;
+            } 
 
             send_to_socket(username);
             send_to_socket(password);
@@ -61,36 +73,57 @@ class Client
         }
         void send_to_server()
         {
-            std::string command;
-            std::cout << "Receiver >> ";
-            std::getline(std::cin, command);
-            send_to_socket(command);
-            std::cout << "Subject >> ";
-            std::getline(std::cin, command);
-            send_to_socket(command);
-             // Continue sending message body until user inputs "."
+            std::string receiver;
+            do{
+                std::cout << "Receiver >> ";
+            } while (std::getline(std::cin, receiver) && receiver.empty());
+            send_to_socket(receiver);
+
+            std::string subject;
+            while(true){
+                std::cout << "Subject (max 80 characters) >> ";
+                std::getline(std::cin, subject);
+                if(subject.length() <= MAX_SUBJECT_LENGTH)
+                    break;
+                std::cerr << "ERR: Subject must be no longer than " << MAX_SUBJECT_LENGTH << " characters." << std::endl;
+            }
+            send_to_socket(subject);
+
+            // Continue sending message body until user inputs "."
             std::string message_body;
-            while(1) {
+            while(true) {
                 std::cout << "Message (. to SEND) >> ";
-                std::getline(std::cin, command);  // Send input
-                message_body += command + "\n";
-                if(command == ".") break;  // End when "." is entered
+                std::string message;
+                std::getline(std::cin, message);  // Send input
+                message_body += message + "\n";
+                if(message == ".") break;  // End when "." is entered
             }
             send_to_socket(message_body);
         }
-        void read_to_server()
-        {
+
+        bool valid_input_number(std::string command){
+            return std::all_of(command.begin(), command.end(), ::isdigit);
+        }
+        void message_number_to_server(){
             std::string command;
-            std::cout << "Message Number >> ";
-            std::getline(std::cin, command);
-            send_to_socket(command);
+            while (true) {
+                std::cout << "Message Number >> ";
+                if (std::getline(std::cin, command)) {
+                    if (!command.empty() && valid_input_number(command)) {
+                        send_to_socket(command);
+                        break;
+                    }
+                }
+                std::cerr << "ERR: Please enter a valid number." << std::endl;
+            }
         }
 
-        void delete_to_server(){
-            std::string command;
-            std::cout << "Message Number >> ";
-            std::getline(std::cin, command);
-            send_to_socket(command);
+        void list_to_server(){
+            std::string count = receive_message();
+            print_message(count + " message" + (count == "1" ? "": "s"));
+            int message_counter = 0;
+            while (++message_counter <= std::stoi(count)) 
+                print_message(std::to_string(message_counter) + ": " + receive_message());
         }
 
         std::string receive_message() {
@@ -108,55 +141,29 @@ class Client
         void print_message(std::string message){
             std::cout << "<< " + message << std::endl;
         }
- 
-        void exchange_messages()
+
+        void start()
         {
             while (true)
             {
                 std::string command;
-                std::cout << "<< (LOGIN, SEND, LIST, READ, DEL, QUIT): ";
-                std::getline(std::cin, command);
+                std::cout << "(LOGIN, SEND, LIST, READ, DEL, QUIT) >> ";
+                if (!std::getline(std::cin, command) || command.empty()) continue;
                 send_to_socket(command);
                 std::string response = receive_message();
                 command = to_lower(command);
+
                 if(strncmp(response.c_str(), "ERR", 3) == 0)
                 {
                     print_message(response);
                     continue;
                 }
-                else if(command == "login")
-                {
-                    login_to_server();
-                    print_message(receive_message());
-                }
-                else if(command == "send")
-                {
-                    send_to_server();
-                    print_message(receive_message());
-
-                }
-                else if(command == "read")
-                {
-                    read_to_server();
-                    print_message(receive_message());
-                }
-                else if(command == "list")
-                {
-                    std::string count = receive_message();
-                    print_message(count + " messages");
-                    int message_counter = 0;
-                    while (++message_counter <= std::stoi(count)) 
-                        print_message(std::to_string(message_counter) + ": " + receive_message());
-                }
-                else if(command == "delete" || command == "del")
-                {
-                    delete_to_server();
-                    print_message(receive_message());
-                }
-                else if(command == "quit")
-                {
-                    // print_message(receive_message());
-                    exit(0);
+                for (const auto& [name, func] : server_commands) {
+                    if (command == name) {
+                        func(); 
+                        if(command != "list" && command != "quit" ) 
+                            print_message(receive_message());
+                    }
                 }
             }
         }
@@ -166,6 +173,15 @@ class Client
         int serverPort;
         std::string buffer;
         NetworkSocket* socket;
+        const size_t MAX_SUBJECT_LENGTH = 80;
+        std::map<std::string, std::function<void()>> server_commands = {
+            { "login", [this]() { login_to_server(); }},
+            { "send", [this]() { send_to_server(); }},
+            { "read",  [this]() { message_number_to_server(); }},
+            { "del", [this]() { message_number_to_server(); }},
+            { "list", [this]() { list_to_server(); }},
+            { "quit", [this](){ exit(0); }}
+        };
 
         std::string to_lower(std::string message)
         {
@@ -173,9 +189,8 @@ class Client
                 [](unsigned char c){ return std::tolower(c); });
             return message;
         }
-      
-
 };
+
 int main(int argc, char* argv[])
 {
     if(argc < 3)
@@ -187,6 +202,6 @@ int main(int argc, char* argv[])
     std::string port = argv[2];
     Client* client = new Client(ip, std::stoi(port));
     client->connect_to_server();
-    client->exchange_messages();
+    client->start();
     return 0;
 }

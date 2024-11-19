@@ -157,6 +157,7 @@ class Server
             std::string clientIp = get_client_ip(clientSfd);
 
             if(is_user_in_blacklist(clientIp) ){
+                std::cout << "IP is in Blacklist" << std::endl;
                 if(!is_blacklist_expired(clientIp)){
                     std::string message = set_error_message("You are blacklisted. Try again in " + std::to_string(minutes_in_blacklist) + " min.");
                     send_to_socket(clientSfd, message);
