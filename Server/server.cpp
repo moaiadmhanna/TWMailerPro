@@ -39,6 +39,7 @@ class Server
                 {
                     std::string clientIp = get_client_ip(clientSfd);
                     std::cout << "Client accepted with ID: " << clientSfd << std::endl;
+                    send_to_socket(clientSfd, "==== TW-Mailer PRO ====");
                     Ldap *ldapServer = new Ldap();
                     std::string command;
                     while(true)
@@ -69,6 +70,7 @@ class Server
         const int max_login_attempts = 3;
         DirectoryManager *directoryManager;
         BlacklistManager *blacklistManager;
+        const int connections_backlog = 6;
         
         std::map<std::string, std::function<void(int, Ldap*, std::string)>> options = {
             { "login", [this](int clientSfd, Ldap* ldapServer, std::string clientIp) { handle_login(clientSfd, ldapServer, clientIp); }},
@@ -80,7 +82,7 @@ class Server
 
         void listening()
         {
-            if (listen(this->socket->getSfd(), 6) == -1 )
+            if (listen(this->socket->getSfd(), connections_backlog) == -1 )
             {
                 std::cerr << "Connection could not be established. Socket is unable to accept new connections." << errno << std::endl;
                 exit(EXIT_FAILURE);
@@ -95,7 +97,7 @@ class Server
                 inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
                 return std::string(client_ip);
             }
-            return "";
+            return "Unknown";
         }
         void handle_login(int clientSfd, Ldap* ldapServer, std::string clientIp)
         {

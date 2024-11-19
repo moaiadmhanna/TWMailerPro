@@ -36,6 +36,7 @@ class Client
 
         void start()
         {
+            std::cout << "\n" << receive_message() << "\n" << std::endl;
             while (true)
             {
                 std::string command;

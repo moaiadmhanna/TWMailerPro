@@ -74,6 +74,11 @@ class BlacklistManager
                         lines.push_back(line);
                 }
             }
+            else
+            {
+                std::cerr << "Error: Unable to create or open the blacklist file: " << blackListFile << std::endl;
+                perror("Error details");  // Provides more details on the error
+            }
             fileIn.close();
 
             // Rewrite the file with only the lines we kept
@@ -82,6 +87,11 @@ class BlacklistManager
             {
                 for (const auto& line : lines)
                     fileOut << line << "\n"; 
+            }
+            else
+            {
+                std::cerr << "Error: Unable to create or open the blacklist file: " << blackListFile << std::endl;
+                perror("Error details");  // Provides more details on the error
             }
             fileOut.close();
         }
