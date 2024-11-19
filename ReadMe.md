@@ -37,11 +37,11 @@ The TW-Mailer Pro project is implemented in C++, leveraging modern programming p
 - Ensures security by persisting blacklisted IPs across server restarts.
 
 ## Features
-- **Login**: Send messages to other users and save them in the recipient's directory.
+- **Login**: Authenticate users by verifying credentials against an LDAP server.
 - **Send Messages**: Send messages to other users and save them in the recipient's directory.
 - **List Messages**: View all messages in your own inbox (directory).
-- **Read Messages**: Read specific messages from specific users in your own directory.
-- **Delete Messages**: Delete specific messages from specific users in your own directory.
+- **Read Messages**: Read specific messages in your own directory.
+- **Delete Messages**: Delete specific messages from your own directory.
 
 ## User Input
 Here are the possible user inputs for the TwMailerPro system:
@@ -56,13 +56,13 @@ Here are the possible user inputs for the TwMailerPro system:
      
 ```LIST```: List all messages in your own inbox (directory).
 
-```READ```: Read a specific message from a specific user in your own directory.
+```READ```: Read specific messages in your own directory.
    - **Format**:
      ```
      message-number: <number>
      ```
 
-```DEL```: Delete a specific message from a specific user in your own directory.
+```DEL```: Delete a specific message from your own directory.
    - **Format**:
      ```
      message-number: <number>
