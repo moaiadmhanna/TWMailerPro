@@ -1,20 +1,17 @@
-# Ignoriere alles standardmäßig
+# Ignore all
 *
 
-# Behalte die .gitignore-Datei selbst
 !.gitignore
 
-# Behalte den Makefile
 !Makefile
 
-# Behalte den Ordner Server und seinen Inhalt
 !Server/
 !Server/**
 
-# Behalte den Ordner Client und seinen Inhalt
 !Client/
 !Client/**
 
-# Behalte den Ordner Module und seinen Inhalt
 !Module/
 !Module/**
+
+!ReadMe.md
